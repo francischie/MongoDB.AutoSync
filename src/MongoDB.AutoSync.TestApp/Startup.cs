@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using MongoDB.AutoSync.Core.Extensions;
+using MongoDB.AutoSync.Manager.Elastic;
 
 namespace MongoDB.AutoSync.TestApp
 {
@@ -10,7 +11,10 @@ namespace MongoDB.AutoSync.TestApp
     {
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddMongoElasticSync();
+            services.AddMongoElasticSync(o =>
+            {
+                o.Managers.Add(new ElasticSyncManager());
+            });
         }
 
         public void Configure(IApplicationBuilder app, IHostingEnvironment env)

@@ -5,15 +5,26 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Content Remove="appsettings.json" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Folder Include="wwwroot\" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.App"  />
+    <None Include="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\MongoDB.AutoSync.Core\MongoDB.AutoSync.Core.csproj" />
+    <ProjectReference Include="..\MongoDB.AutoSync.Manager.Elastic\MongoDB.AutoSync.Manager.Elastic.csproj" />
   </ItemGroup>
 
 </Project>

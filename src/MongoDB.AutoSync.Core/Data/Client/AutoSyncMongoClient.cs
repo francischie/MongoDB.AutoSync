@@ -5,13 +5,14 @@ using MongoDB.Driver;
 
 namespace MongoDB.AutoSync.Core.Data.Client
 {
+    
+
     public class AutoSyncMongoClient : MongoClient
     {
         private readonly ILogger<AutoSyncMongoClient> _logger;
-        private const string ConnectionStringName = "MongoDB";
-        public AutoSyncMongoClient(IConfiguration config, ILogger<AutoSyncMongoClient> logger) : base(config.GetConnectionString(ConnectionStringName))
+        public AutoSyncMongoClient(IConfiguration config, ILogger<AutoSyncMongoClient> logger, string connectionName = "MongoDB") : base(config.GetConnectionString(connectionName))
         {
-            LogServerInfo(config.GetConnectionString(ConnectionStringName));
+            LogServerInfo(config.GetConnectionString(connectionName));
             _logger = logger;
         }
 
