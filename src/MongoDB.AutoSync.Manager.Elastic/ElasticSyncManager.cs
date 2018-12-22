@@ -8,6 +8,7 @@ namespace MongoDB.AutoSync.Manager.Elastic
 {
     public class ElasticSyncManager : IDocManager
     {
+        public List<string> CollectionsToSync { get; set; }
         public Func<List<BsonDocument>, Task> OnDocumentReceivedAsync { get; set; }
 
 

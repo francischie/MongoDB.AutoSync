@@ -12,8 +12,8 @@ namespace MongoDB.AutoSync.Core.Data.Client
         private readonly ILogger<AutoSyncMongoClient> _logger;
         public AutoSyncMongoClient(IConfiguration config, ILogger<AutoSyncMongoClient> logger, string connectionName = "MongoDB") : base(config.GetConnectionString(connectionName))
         {
-            LogServerInfo(config.GetConnectionString(connectionName));
             _logger = logger;
+            LogServerInfo(config.GetConnectionString(connectionName));
         }
 
         private void LogServerInfo(string connectionString)

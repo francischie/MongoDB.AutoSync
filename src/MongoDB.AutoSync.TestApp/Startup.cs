@@ -1,8 +1,13 @@
-﻿using Microsoft.AspNetCore.Builder;
+﻿using System;
+using System.Collections.Generic;
+using System.Threading;
+using Hangfire;
+using Hangfire.MemoryStorage;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using MongoDB.AutoSync.Core.Extensions;
+using MongoDB.AutoSync.Core.Services;
 using MongoDB.AutoSync.Manager.Elastic;
 
 namespace MongoDB.AutoSync.TestApp
@@ -11,10 +16,12 @@ namespace MongoDB.AutoSync.TestApp
     {
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddMongoElasticSync(o =>
-            {
-                o.Managers.Add(new ElasticSyncManager());
-            });
+            services.AddMongoAutoSync(o => { })
+                .AddHangfire(o => o.UseMemoryStorage(new MemoryStorageOptions
+                {
+                    FetchNextJobTimeout = TimeSpan.FromDays(365*100)
+                }))
+                .AddMvc();
         }
 
         public void Configure(IApplicationBuilder app, IHostingEnvironment env)
@@ -24,10 +31,17 @@ namespace MongoDB.AutoSync.TestApp
                 app.UseDeveloperExceptionPage();
             }
 
-            app.Run(async (context) =>
+            app.UseHangfireServer()
+                .UseHangfireDashboard()
+                .UseMvcWithDefaultRoute();
+
+            AutoSyncManager.Add(new ElasticSyncManager
             {
-                await context.Response.WriteAsync("Hello World!");
+                CollectionsToSync = new List<string> { "ugc.review" }
             });
+
+            var syncService = ActivatorUtilities.CreateInstance<OplogService>(app.ApplicationServices);
+            syncService.StartAsync(new CancellationToken());
         }
     }
 }
