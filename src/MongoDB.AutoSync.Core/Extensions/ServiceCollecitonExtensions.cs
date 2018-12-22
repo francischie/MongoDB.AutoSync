@@ -20,7 +20,6 @@ namespace MongoDB.AutoSync.Core.Extensions
 
             if (services.IsServiceRegistered<IMongoClient>()) return services;
 
-
             return string.IsNullOrEmpty(defaultOption.ConnectionStringName) 
                 ? services.AddSingleton<IMongoClient, AutoSyncMongoClient>()
                 : services.AddSingleton<IMongoClient>(provider => new AutoSyncMongoClient(provider.GetService<IConfiguration>(), provider.GetService<ILogger<AutoSyncMongoClient>>(), defaultOption.ConnectionStringName));

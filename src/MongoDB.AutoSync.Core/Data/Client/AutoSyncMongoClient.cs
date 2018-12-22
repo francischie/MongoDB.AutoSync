@@ -1,12 +1,11 @@
 ﻿using System;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using MongoDB.Bson;
 using MongoDB.Driver;
 
 namespace MongoDB.AutoSync.Core.Data.Client
 {
-    
-
     public class AutoSyncMongoClient : MongoClient
     {
         private readonly ILogger<AutoSyncMongoClient> _logger;
@@ -14,6 +13,7 @@ namespace MongoDB.AutoSync.Core.Data.Client
         {
             _logger = logger;
             LogServerInfo(config.GetConnectionString(connectionName));
+            MongoDefaults.GuidRepresentation = GuidRepresentation.Standard;
         }
 
         private void LogServerInfo(string connectionString)

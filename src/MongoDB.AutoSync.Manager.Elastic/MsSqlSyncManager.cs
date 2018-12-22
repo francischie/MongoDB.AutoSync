@@ -8,31 +8,28 @@ using MongoDB.Bson;
 
 namespace MongoDB.AutoSync.Manager.Elastic
 {
-    public class ElasticSyncManager : IDocManager
+    public class MsSqlSyncManager : IDocManager
     {
-        private readonly ILogger<ElasticSyncManager> _logger;
-        public List<string> CollectionsToSync { get; set; }
 
-        // Event to allow customization before commiting 
-        public Func<List<BsonDocument>, Task> OnDocumentReceivedAsync { get; set; }
+        private readonly ILogger<MsSqlSyncManager> _logger;
 
-
-        public ElasticSyncManager(ILogger<ElasticSyncManager> logger)
+        public MsSqlSyncManager(ILogger<MsSqlSyncManager> logger)
         {
             _logger = logger;
         }
 
+        public List<string> CollectionsToSync { get; set; }
+        public Func<List<BsonDocument>, Task> OnDocumentReceivedAsync { get; set; }
         public void Upsert(BsonValue id, MongoOperation action)
         {
-            _logger.LogInformation("Message received from Elastic");
- }
+            _logger.LogInformation("Message received from MsSql");
+            Thread.Sleep(5000);
+
+        }
 
         public Task DeleteAsync(List<BsonValue> ids)
         {
-
             throw new NotImplementedException();
         }
-
-
     }
 }
