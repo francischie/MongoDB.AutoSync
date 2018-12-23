@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -9,77 +10,111 @@ using MongoDB.Driver;
 
 namespace MongoDB.AutoSync.Core.Services
 {
-    public enum MongoOperation
-    {
-        Upsert,
-        Delete
-    }
-
     public class MongoReplicationService
     {
         private readonly IMongoClient _client;
         private readonly ILogger<MongoReplicationService> _logger;
+        private readonly BlockingCollection<BsonDocument> _documentLimiter = new BlockingCollection<BsonDocument>(2);
+        private readonly ConcurrentQueue<BsonDocument> _queue = new ConcurrentQueue<BsonDocument>();
+        
+        // ReSharper disable once NotAccessedField.Local
+        private Timer _queueVisitorTimer;
 
         public MongoReplicationService(IMongoClient client, ILogger<MongoReplicationService> logger)
         {
             _client = client;
             _logger = logger;
+
         }
+
+        private void TimerCallback(object timerState)
+        {
+            if (!_queue.Any()) return;
+            var limit = new List<BsonDocument>();
+
+            while (_queue.TryDequeue(out var document) || limit.Count >= 100)
+                limit.Add(document);
+
+            var groupByCollection = limit.GroupBy(a => a["ns"].ToString(), a => a)
+                .ToDictionary(a => a.Key, a => a.ToList());
+
+            foreach (var g in groupByCollection)
+            {
+                var collectionName = g.Key.Split(".".ToCharArray());
+                var collection = _client.GetDatabase(collectionName[0]).GetCollection<BsonDocument>(collectionName[1]);
+                var builder = Builders<BsonDocument>.Filter;
+                var filter = builder.In("_id", g.Value.Select(doc => (doc["o"] ?? doc["o2"])["_id"]).ToHashSet());
+                var query = collection.Find(filter);
+                var list = query.ToList();
+
+                g.Value.Clear();
+                list.ForEach(doc => g.Value.Add(doc));
+
+                if (g.Value.Count <= 0) continue;
+
+                Task.WaitAll(AutoSyncManager.Managers.Select(m => Task.Run(() =>
+                {
+                    m.ProcessUpsert(g.Key, g.Value);
+                })).ToArray());
+            }
+
+          
+        }
+
 
         public Task StartAsync(CancellationToken cancellationToken)
         {
-            return Task.Run(async () =>
+            Task.Run(() => StartQueue(), cancellationToken);
+            _queueVisitorTimer = new Timer(TimerCallback, null, 0, 500);
+            return Task.Run(() => StartTailingOplog(), cancellationToken);
+        }
+
+        private void StartQueue()
+        {
+            foreach (var document in _documentLimiter.GetConsumingEnumerable())
+                _queue.Enqueue(document);
+
+          
+        }
+
+
+        private void StartTailingOplog()
+        {
+            try
             {
-                try
+                var collectionNames = AutoSyncManager.Managers.SelectMany(a => a.CollectionsToSync).ToHashSet();
+
+                var collection = _client.GetDatabase("local").GetCollection<BsonDocument>("oplog.rs");
+                var builder = Builders<BsonDocument>.Filter;
+                var filter = builder.In("ns", collectionNames);
+                var options = new FindOptions<BsonDocument>
                 {
-                    var collectionNames = AutoSyncManager.Managers.SelectMany(a => a.CollectionsToSync).ToHashSet();
+                    CursorType = CursorType.TailableAwait
+                };
 
-                    var collection = _client.GetDatabase("local").GetCollection<BsonDocument>("oplog.rs");
-                    var builder = Builders<BsonDocument>.Filter;
-                    var filter = builder.In("ns", collectionNames);
-                    var options = new FindOptions<BsonDocument>
+                while (true)
+                {
+                    try
                     {
-                        CursorType = CursorType.TailableAwait
-                    };
-
-                    while (true)
-                    {
-                        try
+                        using (var cursor = collection.FindSync(filter, options))
                         {
-                            using (var cursor = await collection.FindAsync(filter, options, cancellationToken))
+                            foreach(var document in cursor.ToEnumerable())
                             {
-                                await cursor.ForEachAsync(document =>
-                                {
-
-                                    var id = (document["o"] ?? document["o2"])["_id"];
-                                    var action = document["op"] == "d" ? MongoOperation.Delete : MongoOperation.Upsert;
-
-                                    var tasks = new List<Task>();
-                                   
-                                    AutoSyncManager.Managers.ForEach(m =>
-                                    {
-                                        tasks.Add(Task.Run(() => { m.Upsert(id, action); }, cancellationToken));
-                                    });
-
-                                    Task.WaitAll(tasks.ToArray());
-
-                                }, cancellationToken);
+                                _documentLimiter.Add(document);
                             }
                         }
-                        catch (Exception e)
-                        {
-                            _logger.LogError(e.Message);
-                        }
-                        Thread.Sleep(1000);
                     }
+                    catch (Exception e)
+                    {
+                        _logger.LogError(e.Message);
+                    }
+                    Thread.Sleep(1000);
                 }
-                catch (Exception e)
-                {
-                    _logger.LogError(e.Message);
-                }
-               
-                // ReSharper disable once FunctionNeverReturns
-            }, cancellationToken);
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e.Message);
+            }
         }
 
     }

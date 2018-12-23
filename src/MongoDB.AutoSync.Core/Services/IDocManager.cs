@@ -9,7 +9,7 @@ namespace MongoDB.AutoSync.Core.Services
     {
         List<string> CollectionsToSync { get; set; }
         Func<List<BsonDocument>, Task> OnDocumentReceivedAsync { get; set; }
-        void Upsert(BsonValue id, MongoOperation action);
+        void ProcessUpsert(string collection, List<BsonDocument> documents);
         Task DeleteAsync(List<BsonValue> ids);
 
 

@@ -13,7 +13,6 @@ namespace MongoDB.AutoSync.Core.Data.Client
         {
             _logger = logger;
             LogServerInfo(config.GetConnectionString(connectionName));
-            MongoDefaults.GuidRepresentation = GuidRepresentation.Standard;
         }
 
         private void LogServerInfo(string connectionString)

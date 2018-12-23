@@ -39,12 +39,7 @@ namespace MongoDB.AutoSync.TestApp
             var manager = ActivatorUtilities.CreateInstance<ElasticSyncManager>(app.ApplicationServices);
             manager.CollectionsToSync = new List<string> {"ugc.review"};
             AutoSyncManager.Add(manager);
-
-            var manager2 = ActivatorUtilities.CreateInstance<MsSqlSyncManager>(app.ApplicationServices);
-            manager2.CollectionsToSync = new List<string> { "ugc.review" };
-            AutoSyncManager.Add(manager2);
-
-
+            
             var syncService = ActivatorUtilities.CreateInstance<MongoReplicationService>(app.ApplicationServices);
             syncService.StartAsync(new CancellationToken());
         }

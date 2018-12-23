@@ -4,7 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using MongoDB.AutoSync.Core.Data.Client;
-using MongoDB.AutoSync.Core.Services;
+using MongoDB.Bson;
 using MongoDB.Driver;
 
 namespace MongoDB.AutoSync.Core.Extensions
@@ -15,6 +15,9 @@ namespace MongoDB.AutoSync.Core.Extensions
     {
         public static IServiceCollection AddMongoAutoSync(this IServiceCollection services, Action<AutoSyncOptions> setupAction)
         {
+            MongoDefaults.GuidRepresentation = GuidRepresentation.Standard;
+
+
             var defaultOption = new AutoSyncOptions();
             setupAction(defaultOption);
 
@@ -27,7 +30,7 @@ namespace MongoDB.AutoSync.Core.Extensions
         
         public static bool IsServiceRegistered<TService>(this IServiceCollection services)
         {
-            return services.Any(a => a.ServiceType == typeof(TService) == true);
+            return services.Any(a => a.ServiceType == typeof(TService));
         }
     }
 }
