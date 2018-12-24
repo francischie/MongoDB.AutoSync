@@ -16,11 +16,9 @@ namespace MongoDB.AutoSync.Core.Services
 
         private readonly IMongoClient _client;
         private readonly ILogger<AutoMongoSyncService> _logger;
-        private readonly BlockingCollection<BsonDocument> _documentLimiter = new BlockingCollection<BsonDocument>(2);
-        private readonly ConcurrentQueue<BsonDocument> _queue = new ConcurrentQueue<BsonDocument>();
+        private readonly BlockingCollection<BsonDocument> _documentLimiter = new BlockingCollection<BsonDocument>(1000);
         
-        // ReSharper disable once NotAccessedField.Local
-        private Timer _queueVisitorTimer;
+
 
         public AutoMongoSyncService(IMongoClient client, ILogger<AutoMongoSyncService> logger)
         {
@@ -28,55 +26,50 @@ namespace MongoDB.AutoSync.Core.Services
             _logger = logger;
         }
 
-        private void TimerCallback(object timerState)
-        {
-            if (!_queue.Any()) return;
-            var limit = new List<BsonDocument>();
-
-            while (_queue.TryDequeue(out var document) || limit.Count >= 100)
-                limit.Add(document);
-
-            var groupByCollection = limit.GroupBy(a => a["ns"].ToString(), a => a)
-                .ToDictionary(a => a.Key, a => a.ToList());
-
-            foreach (var g in groupByCollection)
-            {
-                var collectionName = g.Key.Split(".".ToCharArray());
-                var collection = _client.GetDatabase(collectionName[0]).GetCollection<BsonDocument>(collectionName[1]);
-                var builder = Builders<BsonDocument>.Filter;
-
-                var upsertIds = g.Value.Where(doc => doc["op"] != "d").Select(doc => (doc["o"] ?? doc["o2"])["_id"]).ToHashSet();
-                var deleteIds = g.Value.Where(doc => doc["op"] == "d").Select(doc => (doc["o"] ?? doc["o2"])["_id"]).ToHashSet();
-
-                var filter = builder.In("_id", upsertIds);
-                var query = collection.Find(filter);
-                var list = query.ToList();
-
-                if (!list.Any() && !deleteIds.Any()) continue; 
-
-                Task.WaitAll(AutoSyncManager.Managers.Select(m => Task.Run(() =>
-                {
-                    if (list.Any()) m.ProcessUpsert(g.Key, list);
-                    if (deleteIds.Any()) m.ProcessDelete(g.Key, deleteIds);
-                })).ToArray());
-            }
-          
-        }
-
+      
 
         public Task StartAsync()
         {
-            Task.Run(() => StartQueue());
-            _queueVisitorTimer = new Timer(TimerCallback, null, 0, 500);
-            return Task.Run(() => StartTailingOplog());
+            Task.Run(() => StartTailingOplog());
+            return Task.Run(() => StartQueue());
         }
 
         private void StartQueue()
         {
-            foreach (var document in _documentLimiter.GetConsumingEnumerable())
-                _queue.Enqueue(document);
+            while (true)
+            {
+                var limit = new List<BsonDocument>();
 
-          
+                while (_documentLimiter.TryTake(out var document) && limit.Count < 1000)
+                    limit.Add(document);
+
+                if (limit.Any() == false) Thread.Sleep(500);
+                
+                var groupByCollection = limit.GroupBy(a => a["ns"].ToString(), a => a)
+                    .ToDictionary(a => a.Key, a => a.ToList());
+
+                foreach (var g in groupByCollection)
+                {
+                    var collectionName = g.Key.Split(".".ToCharArray());
+                    var collection = _client.GetDatabase(collectionName[0]).GetCollection<BsonDocument>(collectionName[1]);
+                    var builder = Builders<BsonDocument>.Filter;
+
+                    var upsertIds = g.Value.Where(doc => doc["op"] != "d").Select(doc => (doc["o"] ?? doc["o2"])["_id"]).ToHashSet();
+                    var deleteIds = g.Value.Where(doc => doc["op"] == "d").Select(doc => (doc["o"] ?? doc["o2"])["_id"]).ToHashSet();
+
+                    var filter = builder.In("_id", upsertIds);
+                    var query = collection.Find(filter);
+                    var list = query.ToList();
+
+                    if (!list.Any() && !deleteIds.Any()) continue;
+
+                    Task.WaitAll(AutoSyncManager.Managers.Select(m => Task.Run(() =>
+                    {
+                        if (list.Any()) m.ProcessUpsert(g.Key, list);
+                        if (deleteIds.Any()) m.ProcessDelete(g.Key, deleteIds);
+                    })).ToArray());
+                }
+            }
         }
 
 

@@ -1,14 +1,18 @@
 [
   {
-    "CollectionName": "ugc.review",
-    "TargetName" :  "ugc.review.alias",
-    "ExcludeAllByDefault": false,
+    "CollectionName": "ugc.productReview",
+    "TargetName" :  "ugc.review",
+    "ExcludeAllByDefault": true,
     "Properties": {
-      "customerId":"auto",
-      "body": "auto",
-      "title": "auto",
+      "customerId": "auto",
+      "reviewTitle": "auto",
+      "reviewText": "auto",
       "approved": "auto",
-      "languageCode": { "type" : "keyword" }
+      "languageCode": { "type": "keyword" },
+      "translations": {
+        "type": "object",
+        "enabled": false
+      }
     }
   }
 ]

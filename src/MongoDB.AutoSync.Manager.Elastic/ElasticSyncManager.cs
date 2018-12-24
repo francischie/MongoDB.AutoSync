@@ -156,7 +156,7 @@ namespace MongoDB.AutoSync.Manager.Elastic
                     continue;
                 }
 
-                if (source[k] is Guid)
+                if (source.ContainsKey(k) && source[k] is Guid)
                     list.Add(k, new { type = "keyword"});
 
             }
