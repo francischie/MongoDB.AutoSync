@@ -1,7 +1,7 @@
 [
   {
     "CollectionName": "ugc.review",
-    "IndexName" :  "ugc.review.alias",
+    "TargetName" :  "ugc.review.alias",
     "ExcludeAllByDefault": false,
     "Properties": {
       "customerId":"auto",

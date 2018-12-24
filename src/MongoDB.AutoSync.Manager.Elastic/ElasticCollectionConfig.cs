@@ -8,11 +8,10 @@ namespace MongoDB.AutoSync.Manager.Elastic
         public string CollectionName { get; set; }
         public bool ExcludeAllByDefault { get; set; }
         public Dictionary<string, object> Properties { get; set; }
-        public string IndexName { get; set; }
-
-        public string GetIndexName()
+        public string TargetName { get; set; }
+        public string GetTargetName()
         {
-            return string.IsNullOrEmpty(IndexName) ? CollectionName : IndexName;
+            return string.IsNullOrEmpty(TargetName) ? CollectionName : TargetName;
         }
     }
 }

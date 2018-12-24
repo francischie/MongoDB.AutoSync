@@ -54,7 +54,7 @@ namespace MongoDB.AutoSync.Manager.Elastic
             
             var config = _configMap.GetCollectionConfig()[collectionName];
 
-            var indexName = config.GetIndexName(); 
+            var indexName = config.GetTargetName(); 
 
             var dict =  CreateMappingDictionary(document.ToDictionary(), config);
 
@@ -95,7 +95,7 @@ namespace MongoDB.AutoSync.Manager.Elastic
             var json = new StringBuilder();
             var config = _configMap.GetCollectionConfig()[collectionName];
 
-            var indexName = config.GetIndexName();
+            var indexName = config.GetTargetName();
 
             foreach (var d in documents)
             {
