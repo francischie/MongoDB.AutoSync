@@ -7,11 +7,9 @@ namespace MongoDB.AutoSync.Core.Services
 {
     public interface IDocManager
     {
-        List<string> CollectionsToSync { get; set; }
+        List<string> CollectionsToSync { get; }
         Func<List<BsonDocument>, Task> OnDocumentReceivedAsync { get; set; }
         void ProcessUpsert(string collection, List<BsonDocument> documents);
-        Task DeleteAsync(List<BsonValue> ids);
-
-
+        void ProcessDelete(string collection, HashSet<BsonValue> deleteIds);
     }
 }

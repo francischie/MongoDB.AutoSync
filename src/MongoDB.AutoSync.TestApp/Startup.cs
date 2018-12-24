@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Threading;
 using Hangfire;
 using Hangfire.MemoryStorage;
 using Microsoft.AspNetCore.Builder;
@@ -16,12 +14,14 @@ namespace MongoDB.AutoSync.TestApp
     {
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddMongoAutoSync(o => { })
-                .AddHangfire(o => o.UseMemoryStorage(new MemoryStorageOptions
+            services.AddHangfire(o => o.UseMemoryStorage(new MemoryStorageOptions
                 {
                     FetchNextJobTimeout = TimeSpan.FromDays(365*100)
                 }))
                 .AddMvc();
+
+            services.AddMongoAutoSync()
+                .AddElasticSyncManager();
         }
 
         public void Configure(IApplicationBuilder app, IHostingEnvironment env)
@@ -33,15 +33,10 @@ namespace MongoDB.AutoSync.TestApp
 
             app.UseHangfireServer()
                 .UseHangfireDashboard()
-                .UseMvcWithDefaultRoute();
+                .UseMvcWithDefaultRoute()
+                .UseElasticSyncManager()
+                .UseAutoMongoSync();
 
-
-            var manager = ActivatorUtilities.CreateInstance<ElasticSyncManager>(app.ApplicationServices);
-            manager.CollectionsToSync = new List<string> {"ugc.review"};
-            AutoSyncManager.Add(manager);
-            
-            var syncService = ActivatorUtilities.CreateInstance<MongoReplicationService>(app.ApplicationServices);
-            syncService.StartAsync(new CancellationToken());
         }
     }
 }

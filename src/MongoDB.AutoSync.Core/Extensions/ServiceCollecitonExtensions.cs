@@ -1,10 +1,11 @@
 ﻿using System;
 using System.Linq;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using MongoDB.AutoSync.Core.Data.Client;
+using MongoDB.AutoSync.Core.Services;
 using MongoDB.Bson;
+using MongoDB.Bson.Serialization;
+using MongoDB.Bson.Serialization.Serializers;
 using MongoDB.Driver;
 
 namespace MongoDB.AutoSync.Core.Extensions
@@ -13,19 +14,21 @@ namespace MongoDB.AutoSync.Core.Extensions
 
     public static class ServiceCollecitonExtensions
     {
-        public static IServiceCollection AddMongoAutoSync(this IServiceCollection services, Action<AutoSyncOptions> setupAction)
+        public static IServiceCollection AddMongoAutoSync(this IServiceCollection services)
         {
             MongoDefaults.GuidRepresentation = GuidRepresentation.Standard;
 
+            BsonSerializer.RegisterSerializer(typeof(Guid), new GuidSerializer(BsonType.String));
+            
 
-            var defaultOption = new AutoSyncOptions();
-            setupAction(defaultOption);
+            services.AddSingleton<IAutoMongoSyncConfiguration, AutoMongoSyncConfiguration>();
 
             if (services.IsServiceRegistered<IMongoClient>()) return services;
+            services.AddSingleton<IMongoClient, AutoSyncMongoClient>();
 
-            return string.IsNullOrEmpty(defaultOption.ConnectionStringName) 
-                ? services.AddSingleton<IMongoClient, AutoSyncMongoClient>()
-                : services.AddSingleton<IMongoClient>(provider => new AutoSyncMongoClient(provider.GetService<IConfiguration>(), provider.GetService<ILogger<AutoSyncMongoClient>>(), defaultOption.ConnectionStringName));
+            //-- TODO: auto discover all instance of class derived from IDocManager and register
+            
+            return services;
         }
         
         public static bool IsServiceRegistered<TService>(this IServiceCollection services)

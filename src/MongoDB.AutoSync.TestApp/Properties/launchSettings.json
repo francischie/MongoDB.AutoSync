@@ -17,7 +17,7 @@
     },
     "MongoDB.AutoSync.TestApp": {
       "commandName": "Project",
-      "launchBrowser": true,
+      "launchBrowser": false,
       "applicationUrl": "https://localhost:5001;http://localhost:5000",
       "launchUrl": "https://localhost:5001/hangfire/jobs/enqueued",
       "environmentVariables": {
