@@ -1,12 +1,14 @@
 [
   {
-    "Name": "ugc.review",
-    "ExcludeAllByDefault": true,
+    "CollectionName": "ugc.review",
+    "IndexName" :  "ugc.review.alias",
+    "ExcludeAllByDefault": false,
     "Properties": {
       "customerId":"auto",
       "body": "auto",
       "title": "auto",
-      "approved": "auto"
+      "approved": "auto",
+      "languageCode": { "type" : "keyword" }
     }
   }
 ]

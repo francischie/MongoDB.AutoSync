@@ -29,7 +29,7 @@ namespace MongoDB.AutoSync.Manager.Elastic
             var path = Path.Combine(_environment.ContentRootPath, "elasticconfigmap.json");
             var content = File.ReadAllText(path);
             _collectionConfigs = JsonConvert.DeserializeObject<List<ElasticCollectionConfig>>(content)
-                .ToDictionary(a => a.Name, a => a);
+                .ToDictionary(a => a.CollectionName, a => a);
             return _collectionConfigs;
         }
     }

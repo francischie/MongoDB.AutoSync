@@ -37,9 +37,6 @@ namespace MongoDB.AutoSync.Manager.Elastic
 
         public void ProcessUpsert(string collection, List<BsonDocument> documents)
         {
-
-
-
             TryCreateIndexIfNotExist(collection, documents.First());
             _logger.LogInformation("Message received: {0} total", documents.Count);
             _client.BulkInsert(GeneratePayload(collection, documents));
@@ -54,15 +51,16 @@ namespace MongoDB.AutoSync.Manager.Elastic
         {
             if (_trackedCollection.Contains(collectionName)) return;
             _trackedCollection.Add(collectionName);
-
             
             var config = _configMap.GetCollectionConfig()[collectionName];
+
+            var indexName = config.GetIndexName(); 
 
             var dict =  CreateMappingDictionary(document.ToDictionary(), config);
 
             if (dict.Count == 0) return;
 
-            var indexExist = _client.IsIndexExist(collectionName);
+            var indexExist = _client.IsIndexExist(indexName);
 
             if (indexExist)
             {
@@ -71,7 +69,7 @@ namespace MongoDB.AutoSync.Manager.Elastic
                     properties = dict
                 };
                 var body = JsonConvert.SerializeObject(index);
-                _client.UpdateIndex(collectionName, body);
+                _client.UpdateIndex(indexName, body);
 
             }
             else
@@ -87,7 +85,7 @@ namespace MongoDB.AutoSync.Manager.Elastic
                     }
                 };
                 var body = JsonConvert.SerializeObject(index);
-                _client.CreateIndex(collectionName, body);
+                _client.CreateIndex(indexName, body);
             }
         }
 
@@ -96,6 +94,8 @@ namespace MongoDB.AutoSync.Manager.Elastic
         {
             var json = new StringBuilder();
             var config = _configMap.GetCollectionConfig()[collectionName];
+
+            var indexName = config.GetIndexName();
 
             foreach (var d in documents)
             {
@@ -108,7 +108,7 @@ namespace MongoDB.AutoSync.Manager.Elastic
                 {
                     update = new
                     {
-                        _index = collectionName,
+                        _index = indexName,
                         _type = "doc",
                         _id = id
                     }
