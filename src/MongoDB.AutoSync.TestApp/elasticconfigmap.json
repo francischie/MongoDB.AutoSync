@@ -1,0 +1,12 @@
+[
+  {
+    "Name": "ugc.review",
+    "ExcludeAllByDefault": true,
+    "Properties": {
+      "customerId":"auto",
+      "body": "auto",
+      "title": "auto",
+      "approved": "auto"
+    }
+  }
+]

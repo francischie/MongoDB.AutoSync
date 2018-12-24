@@ -10,9 +10,7 @@ using MongoDB.Driver;
 
 namespace MongoDB.AutoSync.Core.Extensions
 {
-
-
-    public static class ServiceCollecitonExtensions
+    public static class ServiceCollectionExtensions
     {
         public static IServiceCollection AddMongoAutoSync(this IServiceCollection services)
         {

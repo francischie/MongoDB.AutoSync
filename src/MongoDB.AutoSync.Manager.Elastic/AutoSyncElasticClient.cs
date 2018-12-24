@@ -1,10 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using Elasticsearch.Net;
 using Microsoft.Extensions.Configuration;
-using MongoDB.Bson;
 using Nest;
 using Nest.JsonNetSerializer;
 using Newtonsoft.Json;
@@ -13,13 +10,15 @@ namespace MongoDB.AutoSync.Manager.Elastic
 {
     public interface IAutoSyncElasticClient
     {
-        void BulkInsert(string collectionName, List<BsonDocument> documents);
+        void BulkInsert(string payload);
+        bool IsIndexExist(string collectionName);
+        void CreateIndex(string collectionName, string body);
+        void UpdateIndex(string collectionName, string body);
     }
     public class AutoSyncElasticClient : IAutoSyncElasticClient
     {
         private readonly IElasticClient _client;
 
-        private HashSet<string> TrackCollection = new HashSet<string>();
 
         public AutoSyncElasticClient(IConfiguration config)
         {
@@ -36,63 +35,26 @@ namespace MongoDB.AutoSync.Manager.Elastic
             return connection;
         }
 
-        public void BulkInsert(string collectionName, List<BsonDocument> documents)
+        public void BulkInsert(string payload)
         {
-            if (!TrackCollection.Contains(collectionName))
-            {
-                InitializeMapping(collectionName, documents.First());
-                TrackCollection.Add(collectionName);
-            }
-
-            var json = new StringBuilder();
-            
-            foreach (var d in documents)
-            {
-                var id = ((Guid)d["_id"]).ToString();
-                var update = new
-                {
-                    update = new
-                    {
-                        _index = collectionName,
-                        _type = "doc",
-                        _id = id
-                    },
-                };
-
-                var content = d.ToDictionary();
-                content.Remove("_id");
-                var doc = new
-                {
-                    doc = content,
-                    doc_as_upsert = true
-                };
-
-                json.AppendLine(JsonConvert.SerializeObject(update));
-                json.AppendLine(JsonConvert.SerializeObject(doc));
-            }
-            var postBody = json.ToString();
-            _client.LowLevel.Bulk<StringResponse>(postBody);
+            _client.LowLevel.Bulk<StringResponse>(payload);
         }
 
-        private void InitializeMapping(string collectionName, BsonDocument document)
+        public bool IsIndexExist(string collectionName)
         {
             var response = _client.LowLevel.IndicesExists<StringResponse>(collectionName);
-            if (response.Success) return;
+            return response.HttpStatusCode == 200;
+        }
 
-            var content = document.ToDictionary()
-                .Where(a => a.Value is Guid && a.Key != "_id")
-                .ToDictionary(a => a.Key, a => new { type = "keyword"});
-            var index = new
-            {
-                mappings = new
-                {
-                    doc = new {
-                        properties = content
-                    }
-                }
-            };
-            var body = JsonConvert.SerializeObject(index);
+        public void CreateIndex(string collectionName, string body)
+        {
             _client.LowLevel.IndicesCreate<StringResponse>(collectionName, body);
+        }
+
+        public void UpdateIndex(string collectionName, string body)
+        {
+            _client.LowLevel.IndicesPutMapping<StringResponse>(collectionName, "doc", body);
+
         }
     }
 

@@ -2,9 +2,9 @@
 using Microsoft.Extensions.DependencyInjection;
 using MongoDB.AutoSync.Core.Services;
 
-namespace MongoDB.AutoSync.Manager.Elastic
+namespace MongoDB.AutoSync.Manager.Elastic.Extensions
 {
-    public static class ApplicationBuilderExtentions
+    public static class ApplicationBuilderExtensions
     {
         public static IApplicationBuilder UseElasticSyncManager(this IApplicationBuilder builder)
         {

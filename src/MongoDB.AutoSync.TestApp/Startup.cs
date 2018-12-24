@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using MongoDB.AutoSync.Core.Extensions;
 using MongoDB.AutoSync.Core.Services;
 using MongoDB.AutoSync.Manager.Elastic;
+using MongoDB.AutoSync.Manager.Elastic.Extensions;
 
 namespace MongoDB.AutoSync.TestApp
 {
