@@ -23,15 +23,33 @@ namespace MongoDB.AutoSync.Core.Services
             _logger = logger;
         }
 
-      
 
-        public Task StartAsync()
+        /// <summary>
+        /// Start auto sync on non-blocking state and 
+        /// </summary>
+        /// <returns></returns>
+        public void StartAutoSync()
         {
-            Task.Run(() => StartTailingOplog());
-            return Task.Run(() => StartQueue());
+            Task.Run(() => StartWithLogging(ProcessQueue));
+            Task.Run(() => StartWithLogging(ProduceQueue));
+        }
+        private void StartWithLogging(Action action)
+        {
+            try
+            {
+                action();
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, e.Message);
+            }
         }
 
-        private void StartQueue()
+
+        /// <summary>
+        /// Process queue continuously and ignore error. 
+        /// </summary>
+        private void ProcessQueue()
         {
             while (true)
             {
@@ -40,8 +58,12 @@ namespace MongoDB.AutoSync.Core.Services
                 while (_documentLimiter.TryTake(out var document) && limit.Count < BufferSize)
                     limit.Add(document);
 
-                if (limit.Any() == false) Thread.Sleep(500);
-                
+                if (limit.Any() == false)
+                {
+                    Thread.Sleep(500);
+                    continue;
+                }
+
                 var groupByCollection = limit.GroupBy(a => a["ns"].ToString(), a => a)
                     .ToDictionary(a => a.Key, a => a.ToList());
 
@@ -51,7 +73,7 @@ namespace MongoDB.AutoSync.Core.Services
                 {
                     var collectionName = g.Key.Split(".".ToCharArray());
                     var collection = _client.GetDatabase(collectionName[0]).GetCollection<BsonDocument>(collectionName[1]);
-                    
+
                     var upsertIds = g.Value.Where(doc => doc["op"] != "d").Select(doc => (doc["o"] ?? doc["o2"])["_id"]).ToHashSet();
                     var deleteIds = g.Value.Where(doc => doc["op"] == "d").Select(doc => (doc["o"] ?? doc["o2"])["_id"]).ToHashSet();
 
@@ -63,8 +85,8 @@ namespace MongoDB.AutoSync.Core.Services
 
                     Task.WaitAll(AutoSyncManager.Managers.Select(m => Task.Run(() =>
                     {
-                        m.ProcessUpsert(g.Key, list);
-                        //if (deleteIds.Any()) m.ProcessDelete(g.Key, deleteIds);
+                        if (list.Any()) m.ProcessUpsert(g.Key, list);
+                        if (deleteIds.Any()) m.ProcessDelete(g.Key, deleteIds);
                     })).ToArray());
                 }
             }
@@ -72,9 +94,13 @@ namespace MongoDB.AutoSync.Core.Services
         }
 
 
-        private void StartTailingOplog()
+
+        /// <summary>
+        /// Produce queue continuously and ignore error.  
+        /// </summary>
+        private void ProduceQueue()
         {
-            try
+            while (true)
             {
                 var collectionNames = AutoSyncManager.Managers.SelectMany(a => a.CollectionsToSync).ToHashSet();
 
@@ -85,31 +111,27 @@ namespace MongoDB.AutoSync.Core.Services
                 {
                     CursorType = CursorType.TailableAwait
                 };
-
-                while (true)
+                try
                 {
-                    try
+                    using (var cursor = collection.FindSync(filter, options))
                     {
-                        using (var cursor = collection.FindSync(filter, options))
+                        foreach (var document in cursor.ToEnumerable())
                         {
-                            foreach(var document in cursor.ToEnumerable())
-                            {
-                                _documentLimiter.Add(document);
-                            }
+                            _documentLimiter.Add(document);
                         }
                     }
-                    catch (Exception e)
-                    {
-                        _logger.LogError(e.Message);
-                    }
-                    Thread.Sleep(1000);
                 }
+                catch (Exception e)
+                {
+                    _logger.LogError(e.Message);
+                }
+                Thread.Sleep(1000);
             }
-            catch (Exception e)
-            {
-                _logger.LogError(e.Message);
-            }
+            // ReSharper disable once FunctionNeverReturns
+
         }
-        
+
     }
+
+
 }

@@ -3,6 +3,7 @@
     "CollectionName": "ugc.productReview",
     "TargetName" :  "ugc.review",
     "ExcludeAllByDefault": true,
+    "syncIndexField" :  "lastModifiedDate",
     "Properties": {
       "customerId": "auto",
       "reviewTitle": "auto",
@@ -12,7 +13,8 @@
       "translations": {
         "type": "object",
         "enabled": false
-      }
+      },
+      "lastModifiedDate" : "auto"
     }
   }
 ]

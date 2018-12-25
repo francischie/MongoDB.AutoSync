@@ -10,10 +10,11 @@ namespace MongoDB.AutoSync.Manager.Elastic
 {
     public interface IAutoSyncElasticClient
     {
-        void BulkInsert(string payload);
+        void Bulk(string payload);
         bool IsIndexExist(string collectionName);
         void CreateIndex(string collectionName, string body);
         void UpdateIndex(string collectionName, string body);
+        StringResponse Get(string indexName, string id);
     }
     public class AutoSyncElasticClient : IAutoSyncElasticClient
     {
@@ -35,7 +36,7 @@ namespace MongoDB.AutoSync.Manager.Elastic
             return connection;
         }
 
-        public void BulkInsert(string payload)
+        public void Bulk(string payload)
         {
             _client.LowLevel.Bulk<StringResponse>(payload);
         }
@@ -56,6 +57,16 @@ namespace MongoDB.AutoSync.Manager.Elastic
             _client.LowLevel.IndicesPutMapping<StringResponse>(collectionName, "doc", body);
 
         }
+
+     
+
+
+        public StringResponse Get(string indexName, string id)
+        {
+            return  _client.LowLevel.Get<StringResponse>(indexName, "doc", id);
+        }
+
+
     }
 
 
