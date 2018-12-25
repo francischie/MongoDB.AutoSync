@@ -12,13 +12,10 @@ namespace MongoDB.AutoSync.Core.Services
 {
     public class AutoMongoSyncService
     {
-        
-
         private readonly IMongoClient _client;
         private readonly ILogger<AutoMongoSyncService> _logger;
-        private readonly BlockingCollection<BsonDocument> _documentLimiter = new BlockingCollection<BsonDocument>(1000);
-        
-
+        private readonly BlockingCollection<BsonDocument> _documentLimiter = new BlockingCollection<BsonDocument>(BufferSize);
+        const int BufferSize = 1000;
 
         public AutoMongoSyncService(IMongoClient client, ILogger<AutoMongoSyncService> logger)
         {
@@ -40,7 +37,7 @@ namespace MongoDB.AutoSync.Core.Services
             {
                 var limit = new List<BsonDocument>();
 
-                while (_documentLimiter.TryTake(out var document) && limit.Count < 1000)
+                while (_documentLimiter.TryTake(out var document) && limit.Count < BufferSize)
                     limit.Add(document);
 
                 if (limit.Any() == false) Thread.Sleep(500);
@@ -48,28 +45,30 @@ namespace MongoDB.AutoSync.Core.Services
                 var groupByCollection = limit.GroupBy(a => a["ns"].ToString(), a => a)
                     .ToDictionary(a => a.Key, a => a.ToList());
 
+                var builder = Builders<BsonDocument>.Filter;
+
                 foreach (var g in groupByCollection)
                 {
                     var collectionName = g.Key.Split(".".ToCharArray());
                     var collection = _client.GetDatabase(collectionName[0]).GetCollection<BsonDocument>(collectionName[1]);
-                    var builder = Builders<BsonDocument>.Filter;
-
+                    
                     var upsertIds = g.Value.Where(doc => doc["op"] != "d").Select(doc => (doc["o"] ?? doc["o2"])["_id"]).ToHashSet();
                     var deleteIds = g.Value.Where(doc => doc["op"] == "d").Select(doc => (doc["o"] ?? doc["o2"])["_id"]).ToHashSet();
 
                     var filter = builder.In("_id", upsertIds);
-                    var query = collection.Find(filter);
+                    var query = collection.FindSync(filter);
                     var list = query.ToList();
 
                     if (!list.Any() && !deleteIds.Any()) continue;
 
                     Task.WaitAll(AutoSyncManager.Managers.Select(m => Task.Run(() =>
                     {
-                        if (list.Any()) m.ProcessUpsert(g.Key, list);
-                        if (deleteIds.Any()) m.ProcessDelete(g.Key, deleteIds);
+                        m.ProcessUpsert(g.Key, list);
+                        //if (deleteIds.Any()) m.ProcessDelete(g.Key, deleteIds);
                     })).ToArray());
                 }
             }
+            // ReSharper disable once FunctionNeverReturns
         }
 
 
@@ -111,10 +110,6 @@ namespace MongoDB.AutoSync.Core.Services
                 _logger.LogError(e.Message);
             }
         }
-
-        public static void Start()
-        {
-
-        }
+        
     }
 }
