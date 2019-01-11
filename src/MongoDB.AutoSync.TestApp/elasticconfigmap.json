@@ -1,0 +1,68 @@
+[
+  {
+    "collectionName": "ugc.productReview",
+    "targetName": "ugc.review",
+    "ExcludeAllByDefault": true,
+    "syncIndexField": "lastModifiedDate",
+    "properties": {
+      "customerId": "auto",
+      "reviewTitle": "auto",
+      "reviewText": "auto",
+      "approved": "auto",
+      "languageCode": { "type": "keyword" },
+      "translations": {
+        "type": "object",
+        "enabled": false
+      },
+      "lastModifiedDate": "auto"
+    }
+  },
+  {
+    "collectionName": "ugc.question",
+    "targetName": "ugc.question",
+    "excludeAllByDefault": true,
+    "syncIndexField": "lastModifiedDate",
+    "properties": {
+      "customerId": "auto",
+      "productId": "auto",
+      "postedDate": "auto",
+      "approved": "auto",
+      "languageCode": { "type": "keyword" },
+      "visible": "auto",
+      "isDeleted": "auto",
+      "lastModifiedDate": "auto",
+      "abuseCount": "auto",
+      "content": "auto",
+      "status": "auto",
+      "categoryId": "auto",
+      "helpful": "auto",
+      "answerCount": "auto",
+      "lastAnsweredDate": "auto"
+    }
+  },
+  {
+    "collectionName": "ugc.answer",
+    "targetName": "ugc.answer",
+    "excludeAllByDefault": true,
+    "syncIndexField": "lastModifiedDate",
+    "properties": {
+      "customerId": "auto",
+      "productId": "auto",
+      "postedDate": "auto",
+      "approved": "auto",
+      "languageCode": { "type": "keyword" },
+      "visible": "auto",
+      "reviewedByName": "auto",
+      "reviewedBy": "auto",
+      "isDeleted": "auto",
+      "lastModifiedDate": "auto",
+      "abuseCount": "auto",
+      "content": "auto",
+      "questionId": "auto",
+      "helpfulYes": "auto",
+      "helpfulNo": "auto",
+      "userType": "auto",
+      "verifiedPurchase": "auto"
+    }
+  }
+]
