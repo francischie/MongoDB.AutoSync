@@ -8,12 +8,12 @@ namespace MongoDB.AutoSync.Manager.Elastic
 {
     public interface IElasticConfigMap
     {
-        Dictionary<string, ElasticCollectionConfig> GetCollectionConfig();
+        Dictionary<string, CollectionConfig> GetCollectionConfig();
     }
 
     public class ElasticConfigMap : IElasticConfigMap
     {
-        private Dictionary<string, ElasticCollectionConfig> _collectionConfigs;
+        private Dictionary<string, CollectionConfig> _collectionConfigs;
 
         private readonly IHostingEnvironment _environment;
 
@@ -22,13 +22,13 @@ namespace MongoDB.AutoSync.Manager.Elastic
             _environment = environment;
         }
 
-        public Dictionary<string, ElasticCollectionConfig> GetCollectionConfig()
+        public Dictionary<string, CollectionConfig> GetCollectionConfig()
         {
             if (_collectionConfigs != null) return _collectionConfigs;
 
             var path = Path.Combine(_environment.ContentRootPath, "elasticconfigmap.json");
             var content = File.ReadAllText(path);
-            _collectionConfigs = JsonConvert.DeserializeObject<List<ElasticCollectionConfig>>(content)
+            _collectionConfigs = JsonConvert.DeserializeObject<List<CollectionConfig>>(content)
                 .ToDictionary(a => a.CollectionName, a => a);
             return _collectionConfigs;
         }

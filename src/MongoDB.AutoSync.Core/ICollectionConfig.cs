@@ -8,6 +8,7 @@ namespace MongoDB.AutoSync.Core
         bool ExcludeAllByDefault { get; set; }
         Dictionary<string, object> Properties { get; set; }
         string TargetName { get; set; }
-
+        string SyncIndexField { get; set; }
+        string GetTargetName();
     }
 }

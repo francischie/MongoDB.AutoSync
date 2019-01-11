@@ -3,7 +3,7 @@ using MongoDB.AutoSync.Core;
 
 namespace MongoDB.AutoSync.Manager.Elastic
 {
-    public class ElasticCollectionConfig : ICollectionConfig
+    public class CollectionConfig : ICollectionConfig
     {
         public string CollectionName { get; set; }
         public bool ExcludeAllByDefault { get; set; }

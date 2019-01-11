@@ -18,7 +18,9 @@ namespace MongoDB.AutoSync.Manager.Elastic
         private readonly IAutoSyncElasticClient _client;
         private readonly IElasticConfigMap _configMap;
         private readonly HashSet<string> _trackedCollection = new HashSet<string>();
-        private SyncTracker _syncTracker;
+        private readonly Dictionary<string, SyncTracker> _syncTrackers;
+            
+        const string SyncTrackerIndexName = "synctracker"; 
         public IEnumerable<string> CollectionsToSync {
             get
             {
@@ -27,19 +29,17 @@ namespace MongoDB.AutoSync.Manager.Elastic
         }
 
         public Func<List<BsonDocument>, Task> OnDocumentReceivedAsync { get; set; }
-
-
+        
         public ElasticSyncManager(ILogger<ElasticSyncManager> logger, IAutoSyncElasticClient client, IElasticConfigMap configMap)
         {
             _logger = logger;
             _client = client;
             _configMap = configMap;
+            _syncTrackers = new Dictionary<string, SyncTracker>();
         }
 
-        public void ProcessUpsert(string collection, List<BsonDocument> documents)
+        public void ProcessUpsert(string collection, List<BsonDocument> documents, bool dump = false)
         {
-            _logger.LogInformation("Message received: {0} total", documents.Count);
-
             var synctracker = GetSyncTracker(collection);
             if (synctracker == null)
             {
@@ -47,20 +47,25 @@ namespace MongoDB.AutoSync.Manager.Elastic
                 return;
             }
 
-            TryCreateIndexIfNotExist(collection, documents.First());
+            CreateIndexIfNotExist(collection, documents.First());
             var bulkUpsert = GenerateBulkUpsert(collection, documents, synctracker);
-            var syncUpsert = GenerateSingleUpsert("synctracker", collection, synctracker);
+            if (dump)
+                bulkUpsert += GenerateSingleUpsert(SyncTrackerIndexName, collection, synctracker);
 
-            _client.Bulk(bulkUpsert + syncUpsert);
+            _client.Bulk(bulkUpsert);
         }
-
-
         public void ProcessDelete(string collection, HashSet<BsonValue> deleteIds)
         {
-
         }
 
-        private void TryCreateIndexIfNotExist(string collectionName, BsonDocument document)
+        public void RemoveOldSyncData(string indexName, long syncId)
+        {
+            _client.BulkDelete(indexName, syncId);
+        }
+        public IEnumerable<ICollectionConfig> CollectionConfigs => _configMap.GetCollectionConfig().Values;
+   
+
+        private void CreateIndexIfNotExist(string collectionName, BsonDocument document)
         {
             if (_trackedCollection.Contains(collectionName)) return;
             _trackedCollection.Add(collectionName);
@@ -101,8 +106,7 @@ namespace MongoDB.AutoSync.Manager.Elastic
                 _client.CreateIndex(indexName, body);
             }
         }
-
-
+        
         private string GenerateBulkUpsert(string collectionName, List<BsonDocument> documents, SyncTracker synctracker)
         {
             var bulkPayload = new StringBuilder();
@@ -117,12 +121,14 @@ namespace MongoDB.AutoSync.Manager.Elastic
                 RemoveUnmapProperties(dict, config);
                 var single = GenerateSingleUpsert(indexName, id, dict);
                 bulkPayload.AppendLine(single);
-                synctracker.LastReferenceId = dict[config.SyncIndexField];
+                synctracker.LastSyncDate = DateTime.UtcNow;
+                if (dict.ContainsKey(config.SyncIndexField))
+                    synctracker.LastReferenceId = dict[config.SyncIndexField];
             }
             return bulkPayload.ToString();
         }
 
-        private void RemoveUnmapProperties(Dictionary<string, object> source, ElasticCollectionConfig config)
+        private void RemoveUnmapProperties(Dictionary<string, object> source, CollectionConfig config)
         {
             source.Remove("_id");
             var keys = source.Keys.ToList();
@@ -133,7 +139,7 @@ namespace MongoDB.AutoSync.Manager.Elastic
                     source.Remove(k);
         }
 
-        private Dictionary<string, object> CreateMappingDictionary(Dictionary<string, object> source, ElasticCollectionConfig config)
+        private Dictionary<string, object> CreateMappingDictionary(Dictionary<string, object> source, CollectionConfig config)
         {
             var list = new Dictionary<string, object>();
 
@@ -159,28 +165,31 @@ namespace MongoDB.AutoSync.Manager.Elastic
             return list;
         }
 
-        private SyncTracker GetSyncTracker(string collectionName)
+        public SyncTracker GetSyncTracker(string collectionName)
         {
-            if (_syncTracker != null) return _syncTracker;
+            _syncTrackers.TryGetValue(collectionName, out var syncTracker);
 
-            var response = _client.Get("synctracker", collectionName);
+            if (syncTracker != null) return syncTracker;
 
-            switch (response.HttpStatusCode)
+            var response = _client.Get<SyncTracker>(SyncTrackerIndexName, collectionName);
+
+            if (response.Found == false || response.ServerError?.Status == (int) HttpStatusCode.NotFound)
             {
-                case (int) HttpStatusCode.NotFound:
-                    _syncTracker = new SyncTracker
-                    {
-                        CollectionName = collectionName, 
-                        SyncVersionId = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                        LastSyncDate = DateTime.UtcNow
-                    };
-                    break;
-                case (int) HttpStatusCode.OK:
-                    _syncTracker = JsonConvert.DeserializeObject<SyncTracker>(response.Body);
-                    break;
+                syncTracker = new SyncTracker
+                {
+                    CollectionName = collectionName,
+                    SyncVersionId = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+                };
+                var upsert = GenerateSingleUpsert(SyncTrackerIndexName, collectionName, _syncTrackers);
+                _client.Bulk(upsert);
+            }
+            else
+            {
+                syncTracker = response.Source;
             }
 
-            return _syncTracker;
+            _syncTrackers.Add(collectionName, syncTracker);
+            return syncTracker;
         }
 
         private string GenerateSingleUpsert<T>(string index, object id , T model)

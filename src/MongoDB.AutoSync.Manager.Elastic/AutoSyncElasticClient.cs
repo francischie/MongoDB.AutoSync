@@ -15,6 +15,8 @@ namespace MongoDB.AutoSync.Manager.Elastic
         void CreateIndex(string collectionName, string body);
         void UpdateIndex(string collectionName, string body);
         StringResponse Get(string indexName, string id);
+        IGetResponse<T> Get<T>(string indexName, string id) where T : class;
+        void BulkDelete(string indexName, long syncId);
     }
     public class AutoSyncElasticClient : IAutoSyncElasticClient
     {
@@ -32,7 +34,7 @@ namespace MongoDB.AutoSync.Manager.Elastic
                 .Select(a => new Uri(a));
             var pool = new StaticConnectionPool(uris);
             var connection = new ConnectionSettings(pool, (builtin, settings) => new JsonNetSerializer(
-                builtin, settings, () => new JsonSerializerSettings {  DefaultValueHandling = DefaultValueHandling.Populate }));
+                builtin, settings, () => new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate }));
             return connection;
         }
 
@@ -58,17 +60,30 @@ namespace MongoDB.AutoSync.Manager.Elastic
 
         }
 
-     
+
 
 
         public StringResponse Get(string indexName, string id)
         {
-            return  _client.LowLevel.Get<StringResponse>(indexName, "doc", id);
+            return _client.LowLevel.Get<StringResponse>(indexName, "doc", id);
         }
 
+        public IGetResponse<T> Get<T>(string indexName, string id) where T : class
+        {
+            var path = new DocumentPath<T>(id).Index(indexName).Type("doc");
+            return _client.Get(path);
+        }
 
+        public void BulkDelete(string indexName, long syncId)
+        {
+            var query = new DeleteByQueryRequest(indexName, "doc")
+            {
+                QueryOnQueryString = $"SyncVersionId={syncId}"
+            };
+            _client.DeleteByQuery(query);
+        }
     }
 
 
-  
+
 }

@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using MongoDB.Bson;
+using MongoDB.Bson.Serialization;
 using MongoDB.Driver;
 
 namespace MongoDB.AutoSync.Core.Services
@@ -30,9 +31,58 @@ namespace MongoDB.AutoSync.Core.Services
         /// <returns></returns>
         public void StartAutoSync()
         {
-            Task.Run(() => StartWithLogging(ProcessQueue));
-            Task.Run(() => StartWithLogging(ProduceQueue));
+            Task.Run(() => StartWithLogging(StartDumping)).ContinueWith(task =>
+            {
+                Task.Run(() => StartWithLogging(ConsumeQueue));
+                Task.Run(() => StartWithLogging(ProduceQueue));
+            });
         }
+
+        private void StartDumping()
+        {
+            _logger.LogInformation("Starting dump for all sync manager");
+            foreach (var m in AutoSyncManager.Managers)
+                foreach (var c in m.CollectionConfigs)
+                    GetAllRecordsForTheCollection(m, c);
+        }
+
+        private void GetAllRecordsForTheCollection(IDocManager m, ICollectionConfig c)
+        {
+            _logger.LogInformation("Performing dump from {0} to {1}", c.CollectionName, c.TargetName);
+            var builder = Builders<BsonDocument>.Filter;
+            var synctracker = m.GetSyncTracker(c.CollectionName);
+            var filter = synctracker.LastReferenceId == null
+                ? builder.Empty
+                : builder.Gt(c.SyncIndexField, synctracker.LastReferenceId);
+            var dbCollectName = c.CollectionName.Split(".".ToCharArray(), StringSplitOptions.RemoveEmptyEntries);
+            var collection = _client.GetDatabase(dbCollectName[0]).GetCollection<BsonDocument>(dbCollectName[1]);
+            var documentLimiter = new List<BsonDocument>();
+            var sorter = Builders<BsonDocument>.Sort.Ascending(c.SyncIndexField);
+            var options = new FindOptions<BsonDocument> { NoCursorTimeout = true, Sort = sorter };
+            var counter = 0;
+            using (var cursor = collection.FindSync(filter, options))
+            {
+                foreach (var document in cursor.ToEnumerable())
+                {
+                    counter++;
+                    documentLimiter.Add(document);
+                    if (documentLimiter.Count < 1000) continue;
+                    m.ProcessUpsert(c.CollectionName, documentLimiter, true);
+                    documentLimiter.Clear();
+                    _logger.LogInformation("Total number of record processed: {0}", counter);
+                }
+
+                if (documentLimiter.Any())
+                {
+                    m.ProcessUpsert(c.CollectionName, documentLimiter, true);
+                    documentLimiter.Clear();
+                }
+                _logger.LogInformation("Dump completed for collection {0}!", c.CollectionName);
+                m.RemoveOldSyncData(c.TargetName, synctracker.SyncVersionId);
+            }
+
+        }
+
         private void StartWithLogging(Action action)
         {
             try
@@ -45,11 +95,10 @@ namespace MongoDB.AutoSync.Core.Services
             }
         }
 
-
         /// <summary>
         /// Process queue continuously and ignore error. 
         /// </summary>
-        private void ProcessQueue()
+        private void ConsumeQueue()
         {
             while (true)
             {
@@ -93,23 +142,28 @@ namespace MongoDB.AutoSync.Core.Services
             // ReSharper disable once FunctionNeverReturns
         }
 
-
-
         /// <summary>
         /// Produce queue continuously and ignore error.  
         /// </summary>
         private void ProduceQueue()
         {
+            _logger.LogInformation("Start listening to opLog...");
             while (true)
             {
                 var collectionNames = AutoSyncManager.Managers.SelectMany(a => a.CollectionsToSync).ToHashSet();
 
                 var collection = _client.GetDatabase("local").GetCollection<BsonDocument>("oplog.rs");
                 var builder = Builders<BsonDocument>.Filter;
-                var filter = builder.In("ns", collectionNames);
+                var seconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+                var filter = builder.Gte("ts", new BsonTimestamp((int)seconds, 1))
+                    & builder.In("ns", collectionNames);
+
+                var test = collection.Find(filter);
+
                 var options = new FindOptions<BsonDocument>
                 {
-                    CursorType = CursorType.TailableAwait
+                    CursorType = CursorType.TailableAwait,
+                    OplogReplay = true
                 };
                 try
                 {
@@ -130,6 +184,8 @@ namespace MongoDB.AutoSync.Core.Services
             // ReSharper disable once FunctionNeverReturns
 
         }
+
+
 
     }
 
