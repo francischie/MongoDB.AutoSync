@@ -1,7 +1,8 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using Microsoft.AspNetCore.Hosting;
+using System.Reflection;
 using Newtonsoft.Json;
 
 namespace MongoDB.AutoSync.Manager.Elastic
@@ -15,22 +16,26 @@ namespace MongoDB.AutoSync.Manager.Elastic
     {
         private Dictionary<string, CollectionConfig> _collectionConfigs;
 
-        private readonly IHostingEnvironment _environment;
 
-        public ElasticConfigMap(IHostingEnvironment environment)
+        public ElasticConfigMap()
         {
-            _environment = environment;
         }
 
         public Dictionary<string, CollectionConfig> GetCollectionConfig()
         {
             if (_collectionConfigs != null) return _collectionConfigs;
 
-            var path = Path.Combine(_environment.ContentRootPath, "elasticconfigmap.json");
+            var basePath = GetBasePath();
+            var path = Path.Combine(basePath, "elasticconfigmap.json");
             var content = File.ReadAllText(path);
             _collectionConfigs = JsonConvert.DeserializeObject<List<CollectionConfig>>(content)
                 .ToDictionary(a => a.CollectionName, a => a);
             return _collectionConfigs;
+        }
+
+        private string GetBasePath()
+        {
+            return Path.GetDirectoryName(new Uri(Assembly.GetExecutingAssembly().CodeBase).LocalPath);
         }
     }
 }
