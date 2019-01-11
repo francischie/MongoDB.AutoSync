@@ -16,9 +16,9 @@ namespace MongoDB.AutoSync.Manager.Elastic
     {
         private Dictionary<string, CollectionConfig> _collectionConfigs;
 
-
         public ElasticConfigMap()
         {
+
         }
 
         public Dictionary<string, CollectionConfig> GetCollectionConfig()
