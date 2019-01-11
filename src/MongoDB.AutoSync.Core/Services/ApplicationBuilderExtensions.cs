@@ -14,7 +14,7 @@ namespace MongoDB.AutoSync.Core.Services
         public static IApplicationBuilder UseAutoMongoSync(this IApplicationBuilder builder)
         {
             var syncService = ActivatorUtilities.CreateInstance<AutoMongoSyncService>(builder.ApplicationServices);
-            syncService.StartAutoSync();
+            syncService.StartAsync();
             return builder;
         }
     }

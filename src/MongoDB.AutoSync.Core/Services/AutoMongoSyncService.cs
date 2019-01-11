@@ -6,7 +6,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using MongoDB.Bson;
-using MongoDB.Bson.Serialization;
 using MongoDB.Driver;
 
 namespace MongoDB.AutoSync.Core.Services
@@ -17,6 +16,7 @@ namespace MongoDB.AutoSync.Core.Services
         private readonly ILogger<AutoMongoSyncService> _logger;
         private readonly BlockingCollection<BsonDocument> _documentLimiter = new BlockingCollection<BsonDocument>(BufferSize);
         const int BufferSize = 1000;
+        private CancellationToken _cancellationToken;
 
         public AutoMongoSyncService(IMongoClient client, ILogger<AutoMongoSyncService> logger)
         {
@@ -24,18 +24,30 @@ namespace MongoDB.AutoSync.Core.Services
             _logger = logger;
         }
 
-
         /// <summary>
-        /// Start auto sync on non-blocking state and 
+        /// Start auto sync on non-blocking state and return CancellationTokenSource
         /// </summary>
         /// <returns></returns>
-        public void StartAutoSync()
+        public CancellationTokenSource StartAsync()
         {
-            Task.Run(() => StartWithLogging(StartDumping)).ContinueWith(task =>
+            var cancellationTokenSource = new CancellationTokenSource();
+            var token = cancellationTokenSource.Token;
+            StartAsync(token);
+            return cancellationTokenSource;
+        }
+
+        /// <summary>
+        /// Start auto sync on non-blocking state
+        /// </summary>
+        /// <returns></returns>
+        public void StartAsync(CancellationToken cancellationToken)
+        {
+            _cancellationToken = cancellationToken;
+            Task.Run(() => StartWithLogging(StartDumping), cancellationToken).ContinueWith(task =>
             {
-                Task.Run(() => StartWithLogging(ConsumeQueue));
-                Task.Run(() => StartWithLogging(ProduceQueue));
-            });
+                Task.Run(() => StartWithLogging(ConsumeQueue), _cancellationToken);
+                Task.Run(() => StartWithLogging(ProduceQueue), _cancellationToken);
+            }, _cancellationToken);
         }
 
         private void StartDumping()
@@ -100,7 +112,7 @@ namespace MongoDB.AutoSync.Core.Services
         /// </summary>
         private void ConsumeQueue()
         {
-            while (true)
+            while (_cancellationToken.IsCancellationRequested == false)
             {
                 var limit = new List<BsonDocument>();
 
@@ -134,12 +146,14 @@ namespace MongoDB.AutoSync.Core.Services
 
                     Task.WaitAll(AutoSyncManager.Managers.Select(m => Task.Run(() =>
                     {
+                        _logger.LogInformation("Received message from oplog. {0}", list.Count);
                         if (list.Any()) m.ProcessUpsert(g.Key, list);
                         if (deleteIds.Any()) m.ProcessDelete(g.Key, deleteIds);
-                    })).ToArray());
+                    }, _cancellationToken)).ToArray());
                 }
             }
-            // ReSharper disable once FunctionNeverReturns
+
+            _logger.LogInformation("AutoMongoSync queue consumer terminated!");
         }
 
         /// <summary>
@@ -148,7 +162,7 @@ namespace MongoDB.AutoSync.Core.Services
         private void ProduceQueue()
         {
             _logger.LogInformation("Start listening to opLog...");
-            while (true)
+            while (_cancellationToken.IsCancellationRequested == false)
             {
                 var collectionNames = AutoSyncManager.Managers.SelectMany(a => a.CollectionsToSync).ToHashSet();
 
@@ -158,7 +172,7 @@ namespace MongoDB.AutoSync.Core.Services
                 var filter = builder.Gte("ts", new BsonTimestamp((int)seconds, 1))
                     & builder.In("ns", collectionNames);
 
-                var test = collection.Find(filter);
+                //var test = collection.Find(filter);
 
                 var options = new FindOptions<BsonDocument>
                 {
@@ -169,11 +183,15 @@ namespace MongoDB.AutoSync.Core.Services
                 {
                     using (var cursor = collection.FindSync(filter, options))
                     {
-                        foreach (var document in cursor.ToEnumerable())
+                        foreach (var document in cursor.ToEnumerable(_cancellationToken))
                         {
-                            _documentLimiter.Add(document);
+                            _documentLimiter.Add(document, _cancellationToken);
                         }
                     }
+                }
+                catch (OperationCanceledException)
+                {
+                    _logger.LogInformation("AutoMongoSync queue producer operation cancelled.");
                 }
                 catch (Exception e)
                 {
@@ -181,7 +199,6 @@ namespace MongoDB.AutoSync.Core.Services
                 }
                 Thread.Sleep(1000);
             }
-            // ReSharper disable once FunctionNeverReturns
 
         }
 

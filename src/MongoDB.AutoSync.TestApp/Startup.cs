@@ -34,8 +34,9 @@ namespace MongoDB.AutoSync.TestApp
             app.UseHangfireServer()
                 .UseHangfireDashboard()
                 .UseMvcWithDefaultRoute()
-                .UseElasticSyncManager()
-                .UseAutoMongoSync();
+                .UseElasticSyncManager();
+               
+            BackgroundJob.Enqueue<HangfireLongProcessJob>(a => a.Start(JobCancellationToken.Null));
 
         }
     }

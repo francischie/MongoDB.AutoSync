@@ -1,10 +1,10 @@
 [
   {
-    "CollectionName": "ugc.productReview",
-    "TargetName": "ugc.review",
+    "collectionName": "ugc.productReview",
+    "targetName": "ugc.review",
     "ExcludeAllByDefault": true,
     "syncIndexField": "lastModifiedDate",
-    "Properties": {
+    "properties": {
       "customerId": "auto",
       "reviewTitle": "auto",
       "reviewText": "auto",
@@ -18,11 +18,11 @@
     }
   },
   {
-    "CollectionName": "ugc.question",
-    "TargetName": "ugc.question",
-    "ExcludeAllByDefault": true,
+    "collectionName": "ugc.question",
+    "targetName": "ugc.question",
+    "excludeAllByDefault": true,
     "syncIndexField": "lastModifiedDate",
-    "Properties": {
+    "properties": {
       "customerId": "auto",
       "productId": "auto",
       "postedDate": "auto",
@@ -38,6 +38,31 @@
       "helpful": "auto",
       "answerCount": "auto",
       "lastAnsweredDate": "auto"
+    }
+  },
+  {
+    "collectionName": "ugc.answer",
+    "targetName": "ugc.answer",
+    "excludeAllByDefault": true,
+    "syncIndexField": "lastModifiedDate",
+    "properties": {
+      "customerId": "auto",
+      "productId": "auto",
+      "postedDate": "auto",
+      "approved": "auto",
+      "languageCode": { "type": "keyword" },
+      "visible": "auto",
+      "reviewedByName": "auto",
+      "reviewedBy": "auto",
+      "isDeleted": "auto",
+      "lastModifiedDate": "auto",
+      "abuseCount": "auto",
+      "content": "auto",
+      "questionId": "auto",
+      "helpfulYes": "auto",
+      "helpfulNo": "auto",
+      "userType": "auto",
+      "verifiedPurchase": "auto"
     }
   }
 ]
