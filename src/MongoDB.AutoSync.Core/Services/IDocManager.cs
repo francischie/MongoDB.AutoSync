@@ -7,12 +7,12 @@ namespace MongoDB.AutoSync.Core.Services
 {
     public interface IDocManager
     {
-        IEnumerable<string> CollectionsToSync { get; }
         Func<List<BsonDocument>, Task> OnDocumentReceivedAsync { get; set; }
-        void ProcessUpsert(string collection, List<BsonDocument> documents, bool dump = false);
+        void ProcessUpsert(string collection, List<BsonDocument> documents);
         void ProcessDelete(string collection, HashSet<BsonValue> deleteIds);
-        IEnumerable<ICollectionConfig> CollectionConfigs { get; }
+        IConfigMap ConfigMap { get; set; }
         SyncTracker GetSyncTracker(string collectionName);
         void RemoveOldSyncData(string indexName, long syncId);
+        void UpdateSyncTracker(SyncTracker synctracker);
     }
 }

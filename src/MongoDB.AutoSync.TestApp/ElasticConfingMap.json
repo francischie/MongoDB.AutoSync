@@ -6,15 +6,32 @@
     "syncIndexField": "lastModifiedDate",
     "properties": {
       "customerId": "auto",
-      "reviewTitle": "auto",
-      "reviewText": "auto",
+      "productId": "auto",
+      "postedDate": "auto",
       "approved": "auto",
       "languageCode": { "type": "keyword" },
+      "visible": "auto",
+      "reviewedByName": "auto",
+      "reviewedBy": "auto",
+      "isDeleted": "auto",
+      "lastModifiedDate": "auto",
+      "abuseCount": "auto",
+      "oldReviewId": "auto",
+      "reviewTitle": "auto",
+      "reviewText": "auto",
+      "ratingValue": "auto",
+      "helpfulYes": "auto",
+      "helpfulNo": "auto",
       "translations": {
         "type": "object",
         "enabled": false
       },
-      "lastModifiedDate": "auto"
+      "isClean": "auto",
+      "score": "auto",
+      "imagesCount": "auto",
+      "vendorComments": "auto",
+      "fromLegacy": "auto",
+      "status": "auto"
     }
   },
   {

@@ -3,9 +3,9 @@ using System.Collections.Generic;
 
 namespace MongoDB.AutoSync.Core.Services
 {
-    public class AutoSyncManager
+    public class AutoSyncManagers
     {
-        private static readonly  Lazy<AutoSyncManager> Instance = new Lazy<AutoSyncManager>();
+        private static readonly  Lazy<AutoSyncManagers> Instance = new Lazy<AutoSyncManagers>();
 
         private readonly List<IDocManager> _managers = new List<IDocManager>();
 

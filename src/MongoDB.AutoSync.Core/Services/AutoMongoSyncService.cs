@@ -43,18 +43,16 @@ namespace MongoDB.AutoSync.Core.Services
         public void StartAsync(CancellationToken cancellationToken)
         {
             _cancellationToken = cancellationToken;
-            Task.Run(() => StartWithLogging(StartDumping), cancellationToken).ContinueWith(task =>
-            {
-                Task.Run(() => StartWithLogging(ConsumeQueue), _cancellationToken);
-                Task.Run(() => StartWithLogging(ProduceQueue), _cancellationToken);
-            }, _cancellationToken);
+            StartWithLogging(StartDumping);
+            Task.Run(() => StartWithLogging(ConsumeQueue), _cancellationToken);
+            Task.Run(() => StartWithLogging(ProduceQueue), _cancellationToken);
         }
-
+        
         private void StartDumping()
         {
             _logger.LogInformation("Starting dump for all sync manager");
-            foreach (var m in AutoSyncManager.Managers)
-                foreach (var c in m.CollectionConfigs)
+            foreach (var m in AutoSyncManagers.Managers)
+                foreach (var c in m.ConfigMap.CollectionConfigs.Values)
                     GetAllRecordsForTheCollection(m, c);
         }
 
@@ -77,19 +75,25 @@ namespace MongoDB.AutoSync.Core.Services
                 foreach (var document in cursor.ToEnumerable())
                 {
                     counter++;
+                    document["syncVersionId"] = synctracker.SyncVersionId;
                     documentLimiter.Add(document);
                     if (documentLimiter.Count < 1000) continue;
-                    m.ProcessUpsert(c.CollectionName, documentLimiter, true);
+                    m.ProcessUpsert(c.CollectionName, documentLimiter);
+
+                    synctracker.LastSyncDate = DateTime.UtcNow;
+                    synctracker.LastReferenceId = documentLimiter.Last()[c.SyncIndexField];
+                    m.UpdateSyncTracker(synctracker);
+
                     documentLimiter.Clear();
                     _logger.LogInformation("Total number of record processed: {0}", counter);
                 }
 
                 if (documentLimiter.Any())
                 {
-                    m.ProcessUpsert(c.CollectionName, documentLimiter, true);
+                    m.ProcessUpsert(c.CollectionName, documentLimiter);
                     documentLimiter.Clear();
                 }
-                _logger.LogInformation("Dump completed for collection {0}!", c.CollectionName);
+                _logger.LogInformation("Dump completed for collection {0}! Total records: {1}", c.CollectionName, counter);
                 m.RemoveOldSyncData(c.TargetName, synctracker.SyncVersionId);
             }
 
@@ -144,11 +148,16 @@ namespace MongoDB.AutoSync.Core.Services
 
                     if (!list.Any() && !deleteIds.Any()) continue;
 
-                    Task.WaitAll(AutoSyncManager.Managers.Select(m => Task.Run(() =>
+                    Task.WaitAll(AutoSyncManagers.Managers.Select(m => Task.Run(() =>
                     {
                         _logger.LogInformation("Received message from oplog. {0}", list.Count);
-                        if (list.Any()) m.ProcessUpsert(g.Key, list);
+                        if (list.Any())
+                        {
+                            m.ProcessUpsert(g.Key, list);
+                            //-- TODO: evaluate if we can also update synctracker
+                        }
                         if (deleteIds.Any()) m.ProcessDelete(g.Key, deleteIds);
+
                     }, _cancellationToken)).ToArray());
                 }
             }
@@ -161,19 +170,16 @@ namespace MongoDB.AutoSync.Core.Services
         /// </summary>
         private void ProduceQueue()
         {
-            _logger.LogInformation("Start listening to opLog...");
+            _logger.LogInformation("AutoMongoSync queue producer started!");
             while (_cancellationToken.IsCancellationRequested == false)
             {
-                var collectionNames = AutoSyncManager.Managers.SelectMany(a => a.CollectionsToSync).ToHashSet();
+             
+                var collectionNames = AutoSyncManagers.Managers.SelectMany(a => a.ConfigMap.CollectionConfigs.Values.Select(b => b.CollectionName)).ToHashSet();
 
                 var collection = _client.GetDatabase("local").GetCollection<BsonDocument>("oplog.rs");
                 var builder = Builders<BsonDocument>.Filter;
                 var seconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-                var filter = builder.Gte("ts", new BsonTimestamp((int)seconds, 1))
-                    & builder.In("ns", collectionNames);
-
-                //var test = collection.Find(filter);
-
+                var filter = builder.Gte("ts", new BsonTimestamp((int)seconds, 1)) & builder.In("ns", collectionNames);
                 var options = new FindOptions<BsonDocument>
                 {
                     CursorType = CursorType.TailableAwait,
@@ -191,7 +197,7 @@ namespace MongoDB.AutoSync.Core.Services
                 }
                 catch (OperationCanceledException)
                 {
-                    _logger.LogInformation("AutoMongoSync queue producer operation cancelled.");
+                    _logger.LogInformation("AutoMongoSync queue producer terminated.");
                 }
                 catch (Exception e)
                 {

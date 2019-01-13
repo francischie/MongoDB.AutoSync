@@ -6,7 +6,7 @@
 
   <ItemGroup>
     <Content Remove="appsettings.json" />
-    <Content Remove="elasticconfigmap.json" />
+    <Content Remove="ElasticConfingMap.json" />
   </ItemGroup>
 
   <ItemGroup>
@@ -14,7 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="elasticconfigmap.json">
+    <None Include="ElasticConfingMap.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="appsettings.json">

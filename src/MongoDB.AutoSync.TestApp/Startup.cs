@@ -25,7 +25,7 @@ namespace MongoDB.AutoSync.TestApp
                 .AddElasticSyncManager();
         }
 
-        public void Configure(IApplicationBuilder app, IHostingEnvironment env)
+        public void Configure(IApplicationBuilder app, IHostingEnvironment env, IApplicationLifetime applicationLifetime)
         {
             if (env.IsDevelopment())
             {
@@ -35,11 +35,14 @@ namespace MongoDB.AutoSync.TestApp
             app.UseHangfireServer()
                 .UseHangfireDashboard()
                 .UseMvcWithDefaultRoute();
-            
-            var manager = ActivatorUtilities.CreateInstance<ElasticSyncManager>(app.ApplicationServices);
-            AutoSyncManager.Add(manager);
 
-            BackgroundJob.Enqueue<HangfireLongProcessJob>(a => a.Start(JobCancellationToken.Null));
+            var manager = ActivatorUtilities.CreateInstance<ElasticSyncManager>(app.ApplicationServices);
+            AutoSyncManagers.Add(manager);
+
+            applicationLifetime.ApplicationStarted.Register(() =>
+            {
+                BackgroundJob.Enqueue<HangfireLongProcessJob>(a => a.Start(JobCancellationToken.Null));
+            });
 
         }
     }
