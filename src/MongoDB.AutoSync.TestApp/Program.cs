@@ -1,6 +1,7 @@
 ﻿using System;
 using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Configuration;
 using Serilog;
 using Serilog.Events;
 
@@ -33,11 +34,21 @@ namespace MongoDB.AutoSync.TestApp
                 Log.CloseAndFlush();
             }
         }
-        
+
+        private static void ConfigureConfiguration(WebHostBuilderContext hostingContext, IConfigurationBuilder config)
+        {
+            var env = hostingContext.HostingEnvironment;
+            config.SetBasePath(env.ContentRootPath)
+                .AddJsonFile("appsettings.json", false, true)
+                .AddJsonFile($"appsettings.{env.EnvironmentName}.json", true)
+                .AddEnvironmentVariables();
+        }
+
 
         public static IWebHostBuilder CreateWebHostBuilder(string[] args) =>
             WebHost.CreateDefaultBuilder(args)
                 .UseStartup<Startup>()
-                .UseSerilog();
+                .UseSerilog()
+                .ConfigureAppConfiguration(ConfigureConfiguration);
     }
 }
